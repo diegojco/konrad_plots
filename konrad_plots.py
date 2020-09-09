@@ -1,3 +1,5 @@
+"""A module that helps to plot the results of `konrad`"""
+
 import numpy as np
 from netCDF4 import Dataset as ncload
 import matplotlib.pyplot as plt
@@ -236,7 +238,7 @@ Dvariable_label={
  "O3"    : DO3_a
 }
 
-# Functions
+# Extraction functions
 
 def extract(group,variable,file,
             idx=-1
@@ -370,6 +372,8 @@ def get_from_konrad_ref(variable,exps,exp_ref,
          data_diff,minimum_diff,maximum_diff,
          data_ref,minimum_ref,maximum_ref
         )
+
+# Plotting functions
 
 def plot_from_konrad(variable,exps,
                      same=False,
