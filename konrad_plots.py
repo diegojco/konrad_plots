@@ -15,7 +15,7 @@ p_u       = r"\mathrm{hPa}"
 T_u       = r"\mathrm{K}"
 dTdz_u    = r"\mathrm{K}\,\mathrm{km}^{-1}"
 I_u       = r"\mathrm{W}\,\mathrm{m}^{-2}"
-sigma_u   = r"\mathrm{ppv}"
+sigma_u   = r"1\times 10^{-6}"
 
 ### Quantity symbols
 
@@ -29,7 +29,7 @@ I_swd_s   = r"I_{\mathrm{sw,d}}"
 I_lw_s    = r"I_{\mathrm{lw,net}}"
 I_sw_s    = r"I_{\mathrm{sw,net}}"
 I_s       = r"I_{\mathrm{net}}"
-O3_s      = r"\sigma_{\mathrm{O}$_{3}$}"
+O3_s      = r"\sigma_{\mathrm{O}_{3}}"
 
 ### Difference symbols
 
@@ -93,7 +93,7 @@ ext_def = {
 
 #### Helper functions
 
-def identity(datae):
+def identity(datae,factor=1):
  """Identity function
  
  Parameters
@@ -110,7 +110,7 @@ def identity(datae):
             one field.
  
  """
- return datae[0]
+ return datae[0]*factor
 
 def additive_inverse(datae):
  """Returns the additive inverse
@@ -207,12 +207,12 @@ clc_def = {
  "rlw"   : subtract,
  "rsw"   : subtract,
  "rnet"  : add_differences,
- "O3"    : identity,
+ "O3"    : lambda datae: identity(datae,factor=10**6),
 }
 
 ### Labelling: Profile name
 
-variable_label={
+variable_label = {
  "temp"  : T_a,
  "lapse" : dTdz_a,
  "rlwd"  : I_lwd_a,
@@ -225,7 +225,7 @@ variable_label={
  "O3"    : O3_a,
 }
 
-Dvariable_label={
+Dvariable_label = {
  "temp"  : DT_a,
  "lapse" : DdTdz_a,
  "rlwd"  : DI_lwd_a,
@@ -265,8 +265,36 @@ def extract(group,variable,file,
             The profile at index time `idx` of the requested variable.
             
  """
+ with ncload(file,mode="r") as f:
+  temp = f.groups[group][variable][idx,:]
+  temp = np.array(temp,dtype="float64")
+  return temp
+
+def extract_plev(file,
+                 plevtype="plev"
+                ):
+ """Extracts the pressure levels from `konrad` output.
  
- return ncload(file,mode="r").groups[group][variable][idx,:]
+ Parameters
+ ----------
+ 
+ file     : str
+            Path to the output file.
+ plevtype : {"plev", "phlev"}, optional
+            The pressure level type: pressure full levels (`"plev"`) or pressure
+            half levels (`"phlev"`). The default value is `"plev"`.
+ 
+ Returns
+ -------
+ 
+ numpy.ndarray
+            The list of pressure levels.
+            
+ """
+ with ncload(file,mode="r") as f:
+  temp = f.variables[plevtype][:]
+  temp = np.array(temp,dtype="float64")
+  return temp
 
 def get_from_konrad(variable,exps,
                     idx=-1
@@ -298,14 +326,17 @@ def get_from_konrad(variable,exps,
             
  """
  
- if variable in ["temp","lapse"]:                    # Selecting pressure levels
-  p = ncload(exps[0],mode="r").variables["plev"][:]
+ if variable in ["temp","lapse","O3"]:               # Selecting pressure levels
+  p = extract_plev(exps[0])
  else:
-  p = ncload(exps[0],mode="r").variables["phlev"][:]
-  
- data = { e : clc_def[variable]([ extract(rule[0],rule[1],e,idx=idx)
-                                  for rule in ext_def[variable] ])
-          for e in exps }
+  p = extract_plev(exps[0],plevtype="phlev")
+ 
+ data = [ [ extract(rule[0],rule[1],e,idx=idx)
+            for rule in ext_def[variable] ]
+          for e in exps ]
+ data = [ clc_def[variable](e) for e in data ]
+ data = dict(zip(exps,data))
+ 
  minimum = np.array([ data[e].min() for e in data ]).min()
  maximum = np.array([ data[e].max() for e in data ]).max()
  return (p,data,minimum,maximum)
@@ -351,26 +382,32 @@ def get_from_konrad_ref(variable,exps,exp_ref,
                 
  """
  
- if variable in ["temp","lapse"]:                    # Selecting pressure levels
-  p = ncload(exps[0],mode="r").variables["plev"][:]
+ if variable in ["temp","lapse","O3"]:               # Selecting pressure levels
+  p = extract_plev(exps[0])
  else:
-  p = ncload(exps[0],mode="r").variables["phlev"][:]
-  
- data_diff = { e : clc_def[variable]([ extract(rule[0],rule[1],e,idx=idx)
-                                       for rule in ext_def[variable] ])
-               for e in exps }
- data_ref = clc_def[variable]([ extract(rule[0],rule[1],exp_ref,idx=idx)
-                                for rule in ext_def[variable] ])
- data_diff = { e : data_diff[e] - data_ref for e in exps }
+  p = extract_plev(exps[0],plevtype="phlev")
  
- minimum_diff = np.array([ data_diff[e].min() for e in data_diff ]).min()
- maximum_diff = np.array([ data_diff[e].max() for e in data_diff ]).max()
+ data_ref = [ extract(rule[0],rule[1],exp_ref,idx=idx)
+              for rule in ext_def[variable] ]
+ data_ref = clc_def[variable](data_ref)
+ 
+ data = [ [ extract(rule[0],rule[1],e,idx=idx)
+            for rule in ext_def[variable] ]
+          for e in exps ]
+ data = [ clc_def[variable](e) for e in data ]
+ data = [ e-data_ref for e in data ]
+ data = dict(zip(exps,data))
+ 
+ minimum_diff = np.array([ data[e].min() for e in data ]).min()
+ maximum_diff = np.array([ data[e].max() for e in data ]).max()
  minimum_ref = data_ref.min()
  maximum_ref = data_ref.max()
  
+ data[exp_ref] = data_ref
+ 
  return (p,
-         data_diff,minimum_diff,maximum_diff,
-         data_ref,minimum_ref,maximum_ref
+         data,minimum_diff,maximum_diff,
+         minimum_ref,maximum_ref
         )
 
 # Plotting functions
@@ -600,14 +637,11 @@ def plot_from_konrad_diff(variable,exps,exp_ref,
  """
  
  (p,
-  data_diff,minimum_diff,maximum_diff,
-  data_ref,minimum_ref,maximum_ref
+  data,minimum_diff,maximum_diff,
+  minimum_ref,maximum_ref
  ) = get_from_konrad_ref(variable,exps,exp_ref)            # Gets the data
- ext_exps = [exp_ref]                                      # Extends exp list
- [ ext_exps.append(e) for e in exps ]
- data = data_diff                                          # Extends exp data
- data[exp_ref] = data_ref
- n = len(ext_exps)                                         # Experiment count
+ n = len(list(data.keys()))                                # Experiment count
+ ext_exps = list(data.keys())                              # Experiment list
  
  width = 2                                                 # Width (one pair)
  height = 5                                                # Height
@@ -659,7 +693,7 @@ def plot_from_konrad_diff(variable,exps,exp_ref,
   for e in axes:
    ax=axes[e]
    
-   ax.invert_yaxis()                                      # Settings for y-axes
+   ax.invert_yaxis()                                       # Settings for y-axes
    ax.set_yscale("log")
    if e != "ref":
     ax.tick_params(axis='y',which='both',labelleft=False)
@@ -732,7 +766,7 @@ def plot_from_konrad_diff(variable,exps,exp_ref,
      ax.plot(data[e],p,**labels_and_styles)
      
   for e in axes:
-   ax=axes[e]
+   ax = axes[e]
    
    ax.invert_yaxis()                                       # Settings for y-axes
    ax.set_yscale("log")
