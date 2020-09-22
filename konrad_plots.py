@@ -11,15 +11,17 @@ from typhon.plots import formatter
 
 ### Units
 
+t_u       = r"\mathrm{step}"
 p_u       = r"\mathrm{hPa}"
+z_u       = r"\mathrm{km}"
 T_u       = r"\mathrm{K}"
 dTdz_u    = r"\mathrm{K}\,\mathrm{km}^{-1}"
 I_u       = r"\mathrm{W}\,\mathrm{m}^{-2}"
 sigma_u   = r"1\times 10^{-6}"
-ct_u      = r"\mathrm{km}"
 
 ### Quantity symbols
 
+t_s       = r"t"
 p_s       = r"p"
 T_s       = r"T"
 dTdz_s    = r"\Gamma"
@@ -32,9 +34,12 @@ I_sw_s    = r"I_{\mathrm{sw,net}}"
 I_s       = r"I_{\mathrm{net}}"
 O3_s      = r"\sigma_{\mathrm{O}_{3}}"
 ct_s      = r"h_{\mathrm{conv.\,top}}"
+cp_s      = r"h_{\mathrm{cold\,point}}"
+cpT_s     = r"T_{\mathrm{cold\,point}}"
 
 ### Difference symbols
 
+Dt_s      = r"\Delta "+t_s
 Dp_s      = r"\Delta "+p_s
 DT_s      = r"\Delta "+T_s
 DdTdz_s   = r"\Delta "+dTdz_s
@@ -47,9 +52,12 @@ DI_sw_s   = r"\Delta "+I_sw_s
 DI_s      = r"\Delta "+I_s
 DO3_s     = r"\Delta "+O3_s
 Dct_s     = r"\Delta "+ct_s
+Dcp_s     = r"\Delta "+cp_s
+DcpT_s    = r"\Delta "+cpT_s
 
 ### Symbols with units for axes labelling
 
+t_a       = r"$"+t_s+r"/"+t_u+r"$"
 p_a       = r"$"+p_s+r"/"+p_u+r"$"
 T_a       = r"$"+T_s+r"/"+T_u+r"$"
 dTdz_a    = r"$"+dTdz_s+r"/"+dTdz_u+r"$"
@@ -61,8 +69,11 @@ I_lw_a    = r"$"+I_lw_s+r"/"+I_u+r"$"
 I_sw_a    = r"$"+I_sw_s+r"/"+I_u+r"$"
 I_a       = r"$"+I_s+r"/"+I_u+r"$"
 O3_a      = r"$"+O3_s+r"/"+sigma_u+r"$"
-ct_a      = r"$"+ct_s+r"/"+ct_u+r"$"
+ct_a      = r"$"+ct_s+r"/"+z_u+r"$"
+cp_a      = r"$"+cp_s+r"/"+z_u+r"$"
+cpT_a      = r"$"+cpT_s+r"/"+T_u+r"$"
 
+Dt_a      = r"$"+Dt_s+r"/"+t_u+r"$"
 Dp_a      = r"$"+Dp_s+r"/"+p_u+r"$"
 DT_a      = r"$"+DT_s+r"/"+T_u+r"$"
 DdTdz_a   = r"$"+DdTdz_s+r"/"+dTdz_u+r"$"
@@ -74,7 +85,9 @@ DI_lw_a   = r"$"+DI_lw_s+r"/"+I_u+r"$"
 DI_sw_a   = r"$"+DI_sw_s+r"/"+I_u+r"$"
 DI_a      = r"$"+DI_s+r"/"+I_u+r"$"
 DO3_a     = r"$"+DO3_s+r"/"+sigma_u+r"$"
-Dct_a     = r"$"+Dct_s+r"/"+ct_u+r"$"
+Dct_a     = r"$"+Dct_s+r"/"+z_u+r"$"
+Dcp_a     = r"$"+Dcp_s+r"/"+z_u+r"$"
+DcpT_a    = r"$"+DcpT_s+r"/"+T_u+r"$"
 
 ## Profiles that can be plotted
 
@@ -92,6 +105,27 @@ ext_def = {
  "rnet"  : [("radiation","lw_flxd"),("radiation","lw_flxu"),
             ("radiation","sw_flxd"),("radiation","sw_flxu")],
  "O3"    : [("atmosphere","O3")],
+ "ct"    : [("convection","convective_top_height")],
+ "cp"    : [("atmosphere","T"),("atmosphere","z")],
+ "cpT"   : [("atmosphere","T"),("atmosphere","z")],
+}
+
+### Time indexes
+
+tim_ser = {
+ "temp"  : (-1,-1),
+ "lapse" : (-1,-1),
+ "rlwd"  : (-1,-1),
+ "rswd"  : (-1,-1),
+ "rlwu"  : (-1,-1),
+ "rswu"  : (-1,-1),
+ "rlw"   : (-1,-1),
+ "rsw"   : (-1,-1),
+ "rnet"  : (-1,-1),
+ "O3"    : (-1,-1),
+ "ct"    : (0,-1),
+ "cp"    : (0,-1),
+ "cpT"   : (0,-1),
 }
 
 ### Recipes: What to do with the collected fields
@@ -200,6 +234,56 @@ def gradient(datae,factor=1000):
  
  return np.gradient(datae[0],datae[1])*factor
 
+def cold_point(datae,factor=1000):
+ """Obtains a cold point height time series
+ 
+ Parameters
+ ----------
+ 
+ datae    : list
+            List of `np.ndarray` with the fields on which the function operates.
+ factor   : scalar, optional
+            Conversion factor. The default is 1000, for converting from meters
+            to kilometers. 
+ 
+ Returns
+ -------
+ 
+ cp       : numpy.ndarray
+            Cold point time series
+            
+ """
+ cp = np.array([ np.gradient(datae[0][i],datae[1][i])*factor 
+                 for i in range(len(datae[0])) ])
+ cp = np.array([ datae[1][i,np.where(cp[i] >= 0)[0][0]]
+                 for i in range(len(datae[0])) ])/factor
+ return cp
+
+def cold_point_temperature(datae,factor=1000):
+ """Obtains a cold point temperature time series
+ 
+ Parameters
+ ----------
+ 
+ datae    : list
+            List of `np.ndarray` with the fields on which the function operates.
+ factor   : scalar, optional
+            Conversion factor. The default is 1000, for converting from meters
+            to kilometers. 
+ 
+ Returns
+ -------
+ 
+ cpT      : numpy.ndarray
+            Cold point temperature time series
+            
+ """
+ cpT = np.array([ np.gradient(datae[0][i],datae[1][i])*factor 
+                  for i in range(len(datae[0])) ])
+ cpT = np.array([ datae[0][i,np.where(cpT[i] >= 0)[0][0]]
+                  for i in range(len(datae[0])) ])
+ return cpT
+
 #### Dictionary of recipes
 
 clc_def = {
@@ -212,7 +296,10 @@ clc_def = {
  "rlw"   : subtract,
  "rsw"   : subtract,
  "rnet"  : add_differences,
- "O3"    : lambda datae: identity(datae,factor=10**6),
+ "O3"    : lambda datae: identity(datae,factor=1e6),
+ "ct"    : lambda datae: identity(datae,factor=1e-3),
+ "cp"    : cold_point,
+ "cpT"   : cold_point_temperature
 }
 
 ### Labelling: Profile name
@@ -229,6 +316,8 @@ variable_label = {
  "rnet"  : I_a,
  "O3"    : O3_a,
  "ct"    : ct_a,
+ "cp"    : cp_a,
+ "cpT"   : cpT_a,
 }
 
 Dvariable_label = {
@@ -243,15 +332,17 @@ Dvariable_label = {
  "rnet"  : DI_a,
  "O3"    : DO3_a,
  "ct"    : Dct_a,
+ "cp"    : Dcp_a,
+ "cpT"   : DcpT_a,
 }
 
 # Extraction functions
 
 def extract(group,variable,file,
-            idx=-1
+            idxi=0,
+            idxf=-1
            ):
- """Extracts a variable from a group in the `konrad` output files, by default it
- takes the last time available.
+ """Extracts a time series from `konrad` output.
  
  Parameters
  ----------
@@ -262,18 +353,26 @@ def extract(group,variable,file,
             Variable name in the output file.
  file     : str
             Path to the output file.
- idx      : int, optional
-            The required index in the time dimension (the last is the default).
+ idxi     : int, optional
+            The initial index in the time dimension (the first is the default).
+ idxf     : int, optional
+            The final index in the time dimension (the last is the default).
  
  Returns
  -------
  
  numpy.ndarray
-            The profile at index time `idx` of the requested variable.
+            The time series of the `variable`.
             
  """
  with ncload(file,mode="r") as f:
-  temp = f.groups[group][variable][idx,:]
+  if idxi == idxf:
+   temp = f.groups[group][variable][idxi]
+  else:
+   if idxf == -1:
+    temp = f.groups[group][variable][idxi:]
+   else:
+    temp = f.groups[group][variable][idxi:idxf]
   temp = np.array(temp,dtype="float64")
   return temp
 
@@ -303,11 +402,11 @@ def extract_plev(file,
   temp = np.array(temp,dtype="float64")
   return temp
 
-def extract_ct(file,
-               idxi=0,
-               idxf=-1
-              ):
- """Extracts a time series of the convective top from `konrad` output.
+def extract_time(file,
+                 idxi=0,
+                 idxf=-1
+                ):
+ """Extracts time values from `konrad` output.
  
  Parameters
  ----------
@@ -322,18 +421,22 @@ def extract_ct(file,
  Returns
  -------
  
- ct   : numpy.ndarray
-        Time series of the convective top.
+ numpy.ndarray
+        The list of times.
             
  """
  with ncload(file,mode="r") as f:
-  temp = f.groups["convection"]["convective_top_height"][idxi:idxf]
+  if idxi == idxf:
+   temp = f.variables["time"][idxi]
+  else:
+   if idxf == -1:
+    temp = f.variables["time"][idxi:]
+   else:
+    temp = f.variables["time"][idxi:idxf]
   temp = np.array(temp,dtype="float64")
   return temp
 
-def get_from_konrad(variable,exps,
-                    idx=-1
-                   ):
+def get_from_konrad(variable,exps):
  """Extracts a variable from the output files of several `konrad` experiments.
  
  Parameters
@@ -343,76 +446,56 @@ def get_from_konrad(variable,exps,
             Variable name in the output file.
  exps     : list
             List of strings describing the paths to the output files.
- idx      : int, optional
-            The required index in the time dimension (the last is the default).
  
  Returns
  -------
  
- p        : numpy.ndarray
-            Pressure levels corresponding to the variable.
+ p,t      : numpy.ndarray
+            Pressure levels or times corresponding to the variable.
+ t_min    : scalar
+            The minimum of times, if a time series.
+ t_max    : scalar
+            The maximum of times, if a time series.
  data     : dict
-            The requested profiles of the variable at index time `idx` for all
-            the experiments in `exps`.
+            The requested variable for all the experiments in `exps`.
  minimum  : scalar
-            The minimum of all profiles.
+            The minimum of all experiments.
  maximum  : scalar
-            The maximum of all profiles.
+            The maximum of all experiments.
             
  """
  
- if variable in ["temp","lapse","O3"]:               # Selecting pressure levels
+ idx = tim_ser[variable]                             # Select time indexes
+ 
+ if variable in ["temp","lapse","O3"]:               # Select pressure levels
   p = extract_plev(exps[0])
  else:
   p = extract_plev(exps[0],plevtype="phlev")
+  
+ if variable in ["ct","cp","cpT"]:                   # Select times (for ts)
+  t = [ extract_time(e,idxi=idx[0],idxf=idx[1]) for e in exps ]
+  t = dict(zip(exps,t))
+  
+  t_min = np.array([ t[e].min() for e in t ]).min()
+  t_max = np.array([ t[e].max() for e in t ]).max()
  
- data = [ [ extract(rule[0],rule[1],e,idx=idx)
+ data = [ [ extract(rule[0],rule[1],e,idxi=idx[0],idxf=idx[1]) # Extract data
             for rule in ext_def[variable] ]
           for e in exps ]
  data = [ clc_def[variable](e) for e in data ]
  data = dict(zip(exps,data))
  
- minimum = np.array([ data[e].min() for e in data ]).min()
+ minimum = np.array([ data[e].min() for e in data ]).min() # Get extrema
  maximum = np.array([ data[e].max() for e in data ]).max()
- return (p,data,minimum,maximum)
+ 
+ if variable in ["ct","cp","cpT"]:
+  return (t,t_min,t_max,data,minimum,maximum)
+ else:
+  return (p,data,minimum,maximum)
 
-def get_from_konrad_ct(exps,
-                       idxi=0,
-                       idxf=-1
-                      ):
- """Extracts time series of the convective top height in kilometers.
- 
- Parameters
- ----------
- 
- exps : list
-        List of strings describing the paths to the output files.
- idxi : int, optional
-        The initial index in the time dimension (the first is the default).
- idxf : int, optional
-        The final index in the time dimension (the last is the default).
- 
- Returns
- -------
- 
- ct   : numpy.ndarray
-        Time series of the convective top.
-            
- """
- 
- ct = [ extract_ct(e,idxi=idxi,idxf=idxf) / 1000
-        for e in exps ]
- ct = dict(zip(exps,ct))
- 
- minimum = np.array([ ct[e].min() for e in ct ]).min()
- maximum = np.array([ ct[e].max() for e in ct ]).max()
- return (ct,minimum,maximum)
-
-def get_from_konrad_ref(variable,exps,exp_ref,
-                        idx=-1
-                       ):
+def get_from_konrad_ref(variable,exps,exp_ref):
  """Extracts a variable from the output files of several `konrad` experiments
- and calculates their differences from a reference experiment.
+ and calculates the differences from a reference experiment.
  
  Parameters
  ----------
@@ -422,26 +505,25 @@ def get_from_konrad_ref(variable,exps,exp_ref,
  exps         : list
                 List of strings describing the paths to the output files.
  exp_ref      : str
-                Path to the output file of the reference experiment. 
- idx          : int, optional
-                The required index in the time dimension (the last is the
-                default).
+                Path to the output file of the reference experiment.
  
  Returns
  -------
  
- p            : numpy.ndarray
-                Pressure levels corresponding to the variable.
+ p,t          : numpy.ndarray
+                Pressure levels or times corresponding to the variable.
+ t_min        : scalar
+                The minimum of times, if a time series.
+ t_max        : scalar
+                The maximum of times, if a time series.
  data_diff    : dict
-                The requested profiles of the variable at index time `idx` for
-                all the experiments in `exps`. They are difference profiles.
+                The variable relative differences for all experiments in `exps`.
  minimum_diff : scalar
-                The minimum of all profiles.
+                The minimum of all experiments.
  maximum_diff : scalar
-                The maximum of all profiles.
+                The maximum of all experiments.
  data_ref     : numpy.ndarray
-                The requested profile of the variable at index time `idx` for
-                `exp_ref`.
+                The variable values for `exp_ref`.
  minimum_ref  : scalar
                 The reference minimum.
  maximum_ref  : scalar
@@ -449,76 +531,55 @@ def get_from_konrad_ref(variable,exps,exp_ref,
                 
  """
  
- if variable in ["temp","lapse","O3"]:               # Selecting pressure levels
+ idx = tim_ser[variable]                             # Select time indexes
+ 
+ if variable in ["temp","lapse","O3"]:               # Select pressure levels
   p = extract_plev(exps[0])
  else:
   p = extract_plev(exps[0],plevtype="phlev")
+  
+ if variable in ["ct","cp","cpT"]:                   # Select times (for ts)
+  t_ref = extract_time(exp_ref,idxi=idx[0],idxf=idx[1])
+  
+  t = [ extract_time(e,idxi=idx[0],idxf=idx[1]) for e in exps ]
+  t = dict(zip(exps,t))
+  
+  t[exp_ref] = t_ref
+  
+  t_min = np.array([ t[e].min() for e in t ]).min()
+  t_max = np.array([ t[e].max() for e in t ]).max()
  
- data_ref = [ extract(rule[0],rule[1],exp_ref,idx=idx)
+ data_ref = [ extract(rule[0],rule[1],exp_ref,idxi=idx[0],idxf=idx[1])
               for rule in ext_def[variable] ]
- data_ref = clc_def[variable](data_ref)
+ data_ref = clc_def[variable](data_ref)              # Select reference data
  
- data = [ [ extract(rule[0],rule[1],e,idx=idx)
+ data = [ [ extract(rule[0],rule[1],e,idxi=idx[0],idxf=idx[1])
             for rule in ext_def[variable] ]
           for e in exps ]
- data = [ clc_def[variable](e) for e in data ]
- data = [ e - data_ref for e in data ]
+ data = [ clc_def[variable](e) for e in data ]       # Select data
+ if variable in ["ct","cp","cpT"]:                   # Obtain the differences
+  data = [ e - data_ref[-1] for e in data ]
+ else:
+  data = [ e - data_ref for e in data ]
  data = dict(zip(exps,data))
  
- minimum_diff = np.array([ data[e].min() for e in data ]).min()
+ minimum_diff = np.array([ data[e].min() for e in data ]).min() # Get extrema
  maximum_diff = np.array([ data[e].max() for e in data ]).max()
  minimum_ref = data_ref.min()
  maximum_ref = data_ref.max()
  
- data[exp_ref] = data_ref
+ data[exp_ref] = data_ref                            # Pack ref. data together
  
- return (p,
-         data,minimum_diff,maximum_diff,
-         minimum_ref,maximum_ref
-        )
-
-def get_from_konrad_ct_ref(exps,exp_ref,
-                           idxi=0,
-                           idxf=-1
-                          ):
- """Extracts time series of the convective top height in kilometers and compares
- with a reference experiment.
- 
- Parameters
- ----------
- 
- exps    : list
-           List of strings describing the paths to the output files.
- exp_ref : list
-           Path to the output file of the reference experiment.
- idxi    : int, optional
-           The initial index in the time dimension (the first is the default).
- idxf    : int, optional
-           The final index in the time dimension (the last is the default).
- 
- Returns
- -------
- 
- ct      : numpy.ndarray
-           Time series of the convective top.
-            
- """
- 
- ct_ref = extract_ct(exp_ref,idxi=idxi,idxf=idxf) / 1000
- 
- ct = [ extract_ct(e,idxi=idxi,idxf=idxf) / 1000
-        for e in exps ]
- ct = [ e - ct_ref[-1] for e in ct ]
- ct = dict(zip(exps,ct))
- 
- minimum_diff = np.array([ ct[e].min() for e in ct ]).min()
- maximum_diff = np.array([ ct[e].max() for e in ct ]).max()
- minimum_ref = ct_ref.min()
- maximum_ref = ct_ref.max()
- 
- ct[exp_ref]=ct_ref
- return (ct,minimum_diff,maximum_diff,
-         minimum_ref,maximum_ref)
+ if variable in ["ct","cp","cpT"]:
+  return (t,t_min,t_max,
+          data,minimum_diff,maximum_diff,
+          minimum_ref,maximum_ref
+         )
+ else:
+  return (p,
+          data,minimum_diff,maximum_diff,
+          minimum_ref,maximum_ref
+         )
 
 # Plotting functions
 
@@ -684,30 +745,23 @@ def plot_from_konrad(variable,exps,
  
  return (fig,axes)
 
-def plot_from_konrad_ct(exps,
-                        idxi=0,
-                        idxf=-1,
-                        same=False,
-                        delta=0.5,
-                        yrefline=None,
-                        title=None,
-                        labels=None,
-                        styles=None
-                       ):
- """Plots time series of convective top height from several `konrad`
- experiments.
+def plot_from_konrad_ts1(variable,exps,
+                         same=False,
+                         delta=0.5,
+                         yrefline=None,
+                         title=None,
+                         labels=None,
+                         styles=None
+                        ):
+ """Plots a time series of a 1d variable from several `konrad` experiments.
  
  Parameters
  ----------
  
+ variable       : str
+                  Variable name in the output file.
  exps           : list
                   List of strings describing the paths to the output files.
- idxi           : int, optional
-                  The initial index in the time dimension (the first is the
-                  default).
- idxf           : int, optional
-                  The final index in the time dimension (the last is the
-                  default).
  same           : bool, optional
                   If `True`, profiles are plotted in the same pair of axes.
                   Otherwise, there are as many pairs of axes as profiles
@@ -737,14 +791,9 @@ def plot_from_konrad_ct(exps,
                   Axes for the figure.
                   
  """
- 
- (ct,
-  minimum,
-  maximum
- ) = get_from_konrad_ct(exps,idxi=idxi,idxf=idxf)          # Gets the data
+ (times,time_min,time_max,
+  data,minimum,maximum) = get_from_konrad(variable,exps)   # Gets the data 
  n = len(exps)                                             # Experiment count
- 
- times = { e : list(range(len(ct[e]))) for e in ct }       # Get times
  
  width = 5                                                 # Width
  height = 1                                                # Height (one pair)
@@ -754,40 +803,41 @@ def plot_from_konrad_ct(exps,
   fig = plt.figure(dpi=300,figsize=(width,3*height))
   axes = fig.add_subplot(1,1,1)
   
-  for e in ct:                                             # Plotting
+  for e in data:                                           # Plotting
    ax = axes
    if labels == None:
     if styles == None:
-     ax.plot(times[e],ct[e])
+     ax.plot(times[e],data[e])
     elif styles[e] == None:
-     ax.plot(times[e],ct[e])
+     ax.plot(times[e],data[e])
     else:
-     ax.plot(times[e],ct[e],**styles[e])
+     ax.plot(times[e],data[e],**styles[e])
    elif labels[e] == None:
     if styles == None:
-     ax.plot(times[e],ct[e])
+     ax.plot(times[e],data[e])
     elif styles[e] == None:
-     ax.plot(times[e],ct[e])
+     ax.plot(times[e],data[e])
     else:
-     ax.plot(times[e],ct[e],**styles[e])
+     ax.plot(times[e],data[e],**styles[e])
    else:
     if styles == None:
-     ax.plot(times[e],ct[e],label=labels[e])
+     ax.plot(times[e],data[e],label=labels[e])
     elif styles[e] == None:
-     ax.plot(times[e],ct[e],label=labels[e])
+     ax.plot(times[e],data[e],label=labels[e])
     else:
      labels_and_styles = styles[e]
      labels_and_styles["label"] = labels[e]
-     ax.plot(times[e],ct[e],**labels_and_styles)
+     ax.plot(times[e],data[e],**labels_and_styles)
   
   ax = axes
+  ax.set_xlim(time_min - 24,time_max + 24)
   ax.tick_params(axis='x',which='both',
                  labeltop=False,labelsize=6)               # Settings for x-axis
-  ax.set_xlabel("t",fontsize=6)
+  ax.set_xlabel(t_a,fontsize=6)
   
   ax.set_ylim(minimum - delta,maximum + delta)             # Settings for y-axis
   ax.tick_params(axis='y',which='both',labelright=False,labelsize=6)
-  ax.set_ylabel(variable_label["ct"],fontsize=6)
+  ax.set_ylabel(variable_label[variable],fontsize=6)
   
   ax.minorticks_off()                                      # Unsets minor ticks
   
@@ -805,37 +855,38 @@ def plot_from_konrad_ct(exps,
    ax = axes[e]
    if labels == None:
     if styles == None:
-     ax.plot(times[e],ct[e])
+     ax.plot(times[e],data[e])
     elif styles[e] == None:
-     ax.plot(times[e],ct[e])
+     ax.plot(times[e],data[e])
     else:
-     ax.plot(times[e],ct[e],**styles[e])
+     ax.plot(times[e],data[e],**styles[e])
    elif labels[e] == None:
     if styles == None:
-     ax.plot(times[e],ct[e])
+     ax.plot(times[e],data[e])
     elif styles[e] == None:
-     ax.plot(times[e],ct[e])
+     ax.plot(times[e],data[e])
     else:
-     ax.plot(times[e],ct[e],**styles[e])
+     ax.plot(times[e],data[e],**styles[e])
    else:
     if styles == None:
-     ax.plot(times[e],ct[e],label=labels[e])
+     ax.plot(times[e],data[e],label=labels[e])
     elif styles[e] == None:
-     ax.plot(times[e],ct[e],label=labels[e])
+     ax.plot(times[e],data[e],label=labels[e])
     else:
      labels_and_styles = styles[e]
      labels_and_styles["label"] = labels[e]
-     ax.plot(times[e],ct[e],**labels_and_styles)
+     ax.plot(times[e],data[e],**labels_and_styles)
    
+   ax.set_xlim(time_min - 24,time_max + 24)
    if e != exps[-1]:                                       # Settings for x-axes
     ax.tick_params(axis='x',which='both',labelbottom=False,labeltop=False)
    if e == exps[-1]:
     ax.tick_params(axis='x',which='both',labelsize=6)
-    ax.set_xlabel("t",fontsize=6)
+    ax.set_xlabel(t_a,fontsize=6)
    
    ax.set_ylim(minimum - delta,maximum + delta)            # Settings for y-axes
    ax.tick_params(axis='y',which='both',labelsize=6)
-   ax.set_ylabel(variable_label["ct"],fontsize=6)
+   ax.set_ylabel(variable_label[variable],fontsize=6)
    
    ax.minorticks_off()                                     # Unsets minor ticks
    
@@ -1082,34 +1133,28 @@ def plot_from_konrad_diff(variable,exps,exp_ref,
  
  return (fig,axes)
 
-def plot_from_konrad_ct_diff(exps,exp_ref,
-                             idxi=0,
-                             idxf=-1,
-                             same=False,
-                             delta=0.5,
-                             delta_ref=0.5,
-                             yrefline=0,
-                             yrefline_ref=None,
-                             title=None,
-                             labels=None,
-                             styles=None,
-                             label_ref=None,
-                             style_ref=None
-                            ):
+def plot_from_konrad_ts1_diff(variable,exps,exp_ref,
+                              same=False,
+                              delta=0.5,
+                              delta_ref=0.5,
+                              yrefline=0,
+                              yrefline_ref=None,
+                              title=None,
+                              labels=None,
+                              styles=None,
+                              label_ref=None,
+                              style_ref=None
+                             ):
  """Plots time series of convective top height from several `konrad`
  experiments.
  
  Parameters
  ----------
  
+ variable       : str
+                  Variable name in the output file.
  exps           : list
                   List of strings describing the paths to the output files.
- idxi           : int, optional
-                  The initial index in the time dimension (the first is the
-                  default).
- idxf           : int, optional
-                  The final index in the time dimension (the last is the
-                  default).
  same           : bool, optional
                   If `True`, profiles are plotted in the same pair of axes.
                   Otherwise, there are as many pairs of axes as profiles
@@ -1148,16 +1193,12 @@ def plot_from_konrad_ct_diff(exps,exp_ref,
                   Axes for the figure.
                   
  """
- 
- (ct,
-  minimum_diff,maximum_diff,
+ (times,t_min,t_max,
+  data,minimum_diff,maximum_diff,
   minimum_ref,maximum_ref
- ) = get_from_konrad_ct_ref(exps,exp_ref,
-                            idxi=idxi,idxf=idxf)           # Gets the data
- n = len(list(ct.keys()))                                  # Experiment count
- ext_exps = list(ct.keys())                                # Experiment list
- 
- times = { e : list(range(len(ct[e]))) for e in ct }       # Get times
+ ) = get_from_konrad_ref(variable,exps,exp_ref)            # Gets the data
+ n = len(list(data.keys()))                                # Experiment count
+ ext_exps = list(data.keys())                              # Experiment list
  
  width = 5                                                 # Width
  height = 2                                                # Height (two pairs)
@@ -1170,7 +1211,7 @@ def plot_from_konrad_ct_diff(exps,exp_ref,
    "diff" : fig.add_subplot(2,1,2)
   }
   
-  for e in ct:                                             # Plotting
+  for e in data:                                           # Plotting
    ax = axes["diff"]
    labelsd = labels
    stylesd = styles
@@ -1184,27 +1225,27 @@ def plot_from_konrad_ct_diff(exps,exp_ref,
      stylesd = { e : style_ref }
    if labelsd == None:
     if stylesd == None:
-     ax.plot(times[e],ct[e])
+     ax.plot(times[e],data[e])
     elif stylesd[e] == None:
-     ax.plot(times[e],ct[e])
+     ax.plot(times[e],data[e])
     else:
-     ax.plot(times[e],ct[e],**stylesd[e])
+     ax.plot(times[e],data[e],**stylesd[e])
    elif labelsd[e] == None:
     if stylesd == None:
-     ax.plot(times[e],ct[e])
+     ax.plot(times[e],data[e])
     elif stylesd[e] == None:
-     ax.plot(times[e],ct[e])
+     ax.plot(times[e],data[e])
     else:
-     ax.plot(times[e],ct[e],**stylesd[e])
+     ax.plot(times[e],data[e],**stylesd[e])
    else:
     if stylesd == None:
-     ax.plot(times[e],ct[e],label=labelsd[e])
+     ax.plot(times[e],data[e],label=labelsd[e])
     elif stylesd[e] == None:
-     ax.plot(times[e],ct[e],label=labelsd[e])
+     ax.plot(times[e],data[e],label=labelsd[e])
     else:
      labels_and_styles=stylesd[e]
      labels_and_styles["label"]=labelsd[e]
-     ax.plot(times[e],ct[e],**labels_and_styles)
+     ax.plot(times[e],data[e],**labels_and_styles)
   
   for e in axes:
    ax=axes[e]
@@ -1213,14 +1254,14 @@ def plot_from_konrad_ct_diff(exps,exp_ref,
     ax.tick_params(axis='x',which='both',labelbottom=False,labeltop=False)
    if e != "ref":
     ax.tick_params(axis='x',which='both',labelsize=6)
-    ax.set_xlabel("t",fontsize=6)
+    ax.set_xlabel(t_a,fontsize=6)
    
    if e != "ref":                                          # Settings for y-axes
     ax.set_ylim(minimum_diff - delta,maximum_diff + delta)
-    ax.set_ylabel(Dvariable_label["ct"],fontsize=6)
+    ax.set_ylabel(Dvariable_label[variable],fontsize=6)
    if e == "ref":
     ax.set_ylim(minimum_ref - delta_ref,maximum_ref + delta_ref)
-    ax.set_ylabel(variable_label["ct"],fontsize=6)
+    ax.set_ylabel(variable_label[variable],fontsize=6)
    ax.tick_params(axis='y',which='both',labelsize=6)
    
    ax.minorticks_off()                                     # Unsets minor ticks
@@ -1253,40 +1294,40 @@ def plot_from_konrad_ct_diff(exps,exp_ref,
      stylesd = { e : style_ref }
    if labelsd == None:
     if stylesd == None:
-     ax.plot(times[e],ct[e])
+     ax.plot(times[e],data[e])
     elif stylesd[e] == None:
-     ax.plot(times[e],ct[e])
+     ax.plot(times[e],data[e])
     else:
-     ax.plot(times[e],ct[e],**stylesd[e])
+     ax.plot(times[e],data[e],**stylesd[e])
    elif labelsd[e] == None:
     if stylesd == None:
-     ax.plot(times[e],ct[e])
+     ax.plot(times[e],data[e])
     elif stylesd[e] == None:
-     ax.plot(times[e],ct[e])
+     ax.plot(times[e],data[e])
     else:
-     ax.plot(times[e],ct[e],**stylesd[e])
+     ax.plot(times[e],data[e],**stylesd[e])
    else:
     if stylesd == None:
-     ax.plot(times[e],ct[e],label=labelsd[e])
+     ax.plot(times[e],data[e],label=labelsd[e])
     elif stylesd[e] == None:
-     ax.plot(times[e],ct[e],label=labelsd[e])
+     ax.plot(times[e],data[e],label=labelsd[e])
     else:
      labels_and_styles=stylesd[e]
      labels_and_styles["label"]=labelsd[e]
-     ax.plot(times[e],ct[e],**labels_and_styles)
+     ax.plot(times[e],data[e],**labels_and_styles)
    
    if e != exp_ref:                                        # Settings for x-axes
     ax.tick_params(axis='x',which='both',labelbottom=False,labeltop=False)
    if e == exp_ref:
     ax.tick_params(axis='x',which='both',labelsize=6)
-    ax.set_xlabel("t",fontsize=6)
+    ax.set_xlabel(t_a,fontsize=6)
    
    if e != exp_ref:                                        # Settings for y-axes
     ax.set_ylim(minimum_diff - delta,maximum_diff + delta)
-    ax.set_ylabel(Dvariable_label["ct"],fontsize=6)
+    ax.set_ylabel(Dvariable_label[variable],fontsize=6)
    if e == exp_ref:
     ax.set_ylim(minimum_ref - delta_ref,maximum_ref + delta_ref)
-    ax.set_ylabel(variable_label["ct"],fontsize=6)
+    ax.set_ylabel(variable_label[variable],fontsize=6)
    ax.tick_params(axis='y',which='both',labelsize=6)
    
    ax.minorticks_off()                                     # Unsets minor ticks
